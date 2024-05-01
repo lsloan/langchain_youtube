@@ -18,17 +18,19 @@ class YouTubeCaptionLoader(BaseLoader):
     instance of the class has been created, call its `load()` method to begin
     working and return results.
     """
-    EXPIRYSECONDSDEFAULT = 86400  # 24 hours
-    CHUNKMINUTESDEFAULT = 2
-    URLTEMPLATEDEFAULT = ('https://www.youtube.com/watch?'
-                          'v={mediaId}&t={startSeconds}s')
-    LANGUAGESDEFAULT: Sequence[str] = ('en',)
+    CHUNK_MINUTES_DEFAULT = 2
+    URL_TEMPLATE_DEFAULT = ('https://www.youtube.com/watch?'
+                            'v={mediaId}&t={startSeconds}s')
+    LANGUAGES_DEFAULT: Sequence[str] = ('en',)
+    YOUTUBE_METADATA_KEYS_DEFAULT = ('title', 'author')
 
     def __init__(self,
                  mediaUrl: str,
-                 urlTemplate: str = URLTEMPLATEDEFAULT,
-                 chunkMinutes: int = CHUNKMINUTESDEFAULT,
-                 languages: Sequence[str] = LANGUAGESDEFAULT):
+                 urlTemplate: str = URL_TEMPLATE_DEFAULT,
+                 chunkMinutes: int = CHUNK_MINUTES_DEFAULT,
+                 languages: Sequence[str] = LANGUAGES_DEFAULT,
+                 youtubeMetadataKeys: Sequence[str] =
+                 YOUTUBE_METADATA_KEYS_DEFAULT):
         """
         :param mediaUrl: String containing the URL of the media in YouTube to
             be processed.
@@ -44,6 +46,11 @@ class YouTubeCaptionLoader(BaseLoader):
         :param languages: *Optional* Sequence of strings containing language
             codes for which to load captions.  *Defaults to the value of
             `YouTubeCaptionLoader.LANGUAGESDEFAULT`, `('en',)`.*
+        :param youtubeMetadataKeys: *Optional* Sequence of strings containing
+            metadata keys to be extracted from the YouTube video.  *Defaults
+            to the value of
+            `YouTubeCaptionLoader.YOUTUBE_METADATA_KEYS_DEFAULT`,
+            `('title', 'author')`.*
         """
 
         if not mediaUrl:
@@ -58,12 +65,13 @@ class YouTubeCaptionLoader(BaseLoader):
         self.urlTemplate = urlTemplate
         self.chunkMinutes = int(chunkMinutes)
         self.languages = languages
+        self.youtubeMetadataKeys = youtubeMetadataKeys
         self.srtFormatter = SRTFormatter()
 
     def load(self) -> List[Document]:
-        videoData = pytube(self.mediaUrl)
-        videoInfo = {key: value for key in ('title', 'author')
-                     if (value := videoData.__getattribute__(key)) is not None}
+        videoDetails = pytube(self.mediaUrl).vid_info.get('videoDetails', {})
+        videoInfo = {key: value for key in self.youtubeMetadataKeys
+                     if (value := videoDetails.get(key)) is not None}
 
         transcript = (YouTubeTranscriptApi.list_transcripts(
             self.mediaId).find_manually_created_transcript(self.languages))
