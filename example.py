@@ -1,12 +1,10 @@
-import sys
-
 from LangChainYouTube import YouTubeCaptionLoader
 
-mediaId = '7mCE73j59Zs'  # U2 - When Love Comes To Town
-urlTemplate = 'https://www.youtube.com/watch?v={mediaId}&t={startSeconds}s'
+# U2 - When Love Comes To Town
+mediaUrl = 'https://www.youtube.com/watch?v=7mCE73j59Zs'
 
-captionLoader = YouTubeCaptionLoader(
-    mediaId=mediaId,
-    urlTemplate=urlTemplate)
+captionLoader = YouTubeCaptionLoader(mediaUrl)
 
-print(captionLoader.load())
+captionDocuments = captionLoader.load()
+
+print(captionDocuments)

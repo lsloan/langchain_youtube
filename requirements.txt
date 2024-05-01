@@ -1,5 +1,6 @@
-python-youtube==0.9.4
 google-api-python-client==2.127.0
-youtube-transcript-api==0.6.2
-pysrt==1.1.2
 langchain==0.1.16
+pysrt==1.1.2
+python-youtube==0.9.4
+pytube==15.0.0
+youtube-transcript-api==0.6.2
