@@ -60,8 +60,11 @@ class YouTubeCaptionLoader(BaseLoader):
             raise ValueError('urlTemplate must be specified, with fields for'
                              '"{mediaId}" and "{startSeconds}".')
 
-        self.mediaUrl = mediaUrl
         self.mediaId = YoutubeLoader.extract_video_id(mediaUrl)
+        if not self.mediaId:
+            raise ValueError('mediaId could not be extracted from mediaUrl')
+
+        self.mediaUrl = mediaUrl
         self.urlTemplate = urlTemplate
         self.chunkMinutes = int(chunkMinutes)
         self.languages = languages
