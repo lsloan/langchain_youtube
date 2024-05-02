@@ -70,8 +70,8 @@ class YouTubeCaptionLoader(BaseLoader):
 
     def load(self) -> List[Document]:
         videoDetails = pytube(self.mediaUrl).vid_info.get('videoDetails', {})
-        videoInfo = {key: value for key in self.youtubeMetadataKeys
-                     if (value := videoDetails.get(key)) is not None}
+        videoMetadata = {key: value for key in self.youtubeMetadataKeys
+                         if (value := videoDetails.get(key)) is not None}
 
         transcript = (YouTubeTranscriptApi.list_transcripts(
             self.mediaId).find_manually_created_transcript(self.languages))
@@ -94,9 +94,10 @@ class YouTubeCaptionLoader(BaseLoader):
                         startSeconds=captionsSection[0].start.ordinal // 1000
                     ),
                     'media_id': self.mediaId,
+                    'timestamp': str(captionsSection[0].start)[0:-4],  # no ms
                     'language_code': transcript.language_code,
                     'caption_format': 'SRT',
-                    **videoInfo}))
+                    **videoMetadata}))
             index += 1
 
         return captionDocuments
