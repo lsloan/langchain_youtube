@@ -21,7 +21,7 @@ class YouTubeCaptionLoader(BaseLoader):
     CHUNK_MINUTES_DEFAULT = 2
     URL_TEMPLATE_DEFAULT = ('https://www.youtube.com/watch?'
                             'v={mediaId}&t={startSeconds}s')
-    LANGUAGES_DEFAULT: Sequence[str] = ('en',)
+    LANGUAGES_DEFAULT = ('en', 'en-US')
     YOUTUBE_METADATA_KEYS_DEFAULT = ('title', 'author')
 
     def __init__(self,
@@ -38,19 +38,17 @@ class YouTubeCaptionLoader(BaseLoader):
             the `source` metadata property of LangChain `Document` objects.
             It must contain the fields `mediaId` and `startSeconds` ONLY to be
             filled in by `str.format()`.  *Defaults to the value of
-            `YouTubeCaptionLoader.URLTEMPLATEDEFAULT`,
-            `https://www.youtube.com/watch?v={mediaId}&t={startSeconds}s`.*
+            `YouTubeCaptionLoader.URLTEMPLATEDEFAULT`.*
         :param chunkMinutes: *Optional* Integer number of minutes of the length
             of each caption chunk loaded from YouTube.  *Defaults to the value
-            of`YouTubeCaptionLoader.CHUNKMINUTESDEFAULT`, which is `2`.*
+            of`YouTubeCaptionLoader.CHUNKMINUTESDEFAULT`.*
         :param languages: *Optional* Sequence of strings containing language
             codes for which to load captions.  *Defaults to the value of
-            `YouTubeCaptionLoader.LANGUAGESDEFAULT`, `('en',)`.*
+            `YouTubeCaptionLoader.LANGUAGESDEFAULT`.*
         :param youtubeMetadataKeys: *Optional* Sequence of strings containing
             metadata keys to be extracted from the YouTube video.  *Defaults
             to the value of
-            `YouTubeCaptionLoader.YOUTUBE_METADATA_KEYS_DEFAULT`,
-            `('title', 'author')`.*
+            `YouTubeCaptionLoader.YOUTUBE_METADATA_KEYS_DEFAULT`.*
         """
 
         if not mediaUrl:
