@@ -5,7 +5,7 @@ from langchain_community.document_loaders import YoutubeLoader
 from langchain_community.document_loaders.base import BaseLoader
 from langchain_core.documents import Document
 from pytube import YouTube as pytube
-from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound
 from youtube_transcript_api.formatters import SRTFormatter
 
 
@@ -21,7 +21,7 @@ class YouTubeCaptionLoader(BaseLoader):
     CHUNK_MINUTES_DEFAULT = 2
     URL_TEMPLATE_DEFAULT = ('https://www.youtube.com/watch?'
                             'v={mediaId}&t={startSeconds}s')
-    LANGUAGES_DEFAULT = ('en', 'en-US')
+    LANGUAGES_DEFAULT = ('en',)
     YOUTUBE_METADATA_KEYS_DEFAULT = ('title', 'author')
 
     def __init__(self,
@@ -67,17 +67,36 @@ class YouTubeCaptionLoader(BaseLoader):
         self.chunkMinutes = int(chunkMinutes)
         self.languages = languages
         self.youtubeMetadataKeys = youtubeMetadataKeys
-        self.srtFormatter = SRTFormatter()
 
     def load(self) -> List[Document]:
         videoDetails = pytube(self.mediaUrl).vid_info.get('videoDetails', {})
         videoMetadata = {key: value for key in self.youtubeMetadataKeys
                          if (value := videoDetails.get(key)) is not None}
 
-        transcript = (YouTubeTranscriptApi.list_transcripts(
-            self.mediaId).find_manually_created_transcript(self.languages))
+        transcriptList = (YouTubeTranscriptApi.list_transcripts(
+            self.mediaId))
 
-        transcriptSrt = self.srtFormatter.format_transcript(transcript.fetch())
+        try:
+            transcript = (transcriptList
+                          .find_manually_created_transcript(self.languages))
+        except NoTranscriptFound:
+            # Find first transcript in list that is not generated and has a
+            # language code that starts with one of the configured languages.
+            # I.e., `en` may yield one of `en-US`, `en-GB`, etc., if available.
+            transcriptLanguage = None
+            for l in self.languages:
+                for t in transcriptList:
+                    if not t.is_generated and t.language_code.startswith(l):
+                        transcriptLanguage = t.language_code
+                        break
+                if transcriptLanguage:
+                    break
+
+            if not transcriptLanguage:
+                return []
+            transcript = (transcriptList.find_transcript([transcriptLanguage]))
+
+        transcriptSrt = SRTFormatter().format_transcript(transcript.fetch())
 
         captionDocuments: List[Document] = []
         captions = pysrt.from_string(transcriptSrt)
