@@ -5,7 +5,7 @@ from langchain_community.document_loaders import YoutubeLoader
 from langchain_community.document_loaders.base import BaseLoader
 from langchain_core.documents import Document
 from pytube import YouTube as pytube
-from youtube_transcript_api import YouTubeTranscriptApi, NoTranscriptFound
+from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.formatters import SRTFormatter
 
 
@@ -21,7 +21,12 @@ class YouTubeCaptionLoader(BaseLoader):
     CHUNK_MINUTES_DEFAULT = 2
     URL_TEMPLATE_DEFAULT = ('https://www.youtube.com/watch?'
                             'v={mediaId}&t={startSeconds}s')
-    LANGUAGES_DEFAULT = ('en',)
+    LANGUAGES_DEFAULT = (
+        'en-us', 'en', 'en-ca', 'en-gb', 'en-ie', 'en-au', 'en-nz', 'en-bz',
+        'en-jm', 'en-ph', 'en-tt', 'en-za', 'en-zw')
+    """Various English dialects from ISO 639-1, ordered by similarity to 
+      `en-us`.  For an unofficial listing of languages with dialects, see: 
+      https://gist.github.com/jrnk/8eb57b065ea0b098d571#file-iso-639-1-language-json"""
     YOUTUBE_METADATA_KEYS_DEFAULT = ('title', 'author')
 
     def __init__(self,
@@ -44,7 +49,9 @@ class YouTubeCaptionLoader(BaseLoader):
             of`YouTubeCaptionLoader.CHUNKMINUTESDEFAULT`.*
         :param languages: *Optional* Sequence of strings containing language
             codes for which to load captions.  *Defaults to the value of
-            `YouTubeCaptionLoader.LANGUAGESDEFAULT`.*
+            `YouTubeCaptionLoader.LANGUAGESDEFAULT`, a list of various English
+            dialects from ISO 639-1, ordered by similarity to `en-us`.  See:
+            https://gist.github.com/jrnk/8eb57b065ea0b098d571#file-iso-639-1-language-json*
         :param youtubeMetadataKeys: *Optional* Sequence of strings containing
             metadata keys to be extracted from the YouTube video.  *Defaults
             to the value of
@@ -68,33 +75,34 @@ class YouTubeCaptionLoader(BaseLoader):
         self.languages = languages
         self.youtubeMetadataKeys = youtubeMetadataKeys
 
+    def _findTranscript(self, transcriptList):
+        """
+        Find the first transcript in the list that is not generated and has a
+        language code matching one of the languages in the list.
+        YouTubeTranscriptApi does not provide a CASE-INSENSITIVE method to
+        find a transcript by language code.
+        :param transcriptList:
+        :return:
+        """
+        for language in self.languages:
+            for transcript in transcriptList:
+                if (not transcript.is_generated and
+                        transcript.language_code.lower() == language.lower()):
+                    return transcript
+        return None
+
     def load(self) -> List[Document]:
         videoDetails = pytube(self.mediaUrl).vid_info.get('videoDetails', {})
         videoMetadata = {key: value for key in self.youtubeMetadataKeys
                          if (value := videoDetails.get(key)) is not None}
 
-        transcriptList = (YouTubeTranscriptApi.list_transcripts(
-            self.mediaId))
+        transcriptList = (
+            YouTubeTranscriptApi.list_transcripts(self.mediaId))
 
-        try:
-            transcript = (transcriptList
-                          .find_manually_created_transcript(self.languages))
-        except NoTranscriptFound:
-            # Find first transcript in list that is not generated and has a
-            # language code that starts with one of the configured languages.
-            # I.e., `en` may yield one of `en-US`, `en-GB`, etc., if available.
-            transcriptLanguage = None
-            for l in self.languages:
-                for t in transcriptList:
-                    if not t.is_generated and t.language_code.startswith(l):
-                        transcriptLanguage = t.language_code
-                        break
-                if transcriptLanguage:
-                    break
+        transcript = self._findTranscript(transcriptList)
 
-            if not transcriptLanguage:
-                return []
-            transcript = (transcriptList.find_transcript([transcriptLanguage]))
+        if transcript is None:
+            return []
 
         transcriptSrt = SRTFormatter().format_transcript(transcript.fetch())
 
