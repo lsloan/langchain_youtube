@@ -17,6 +17,10 @@ class YouTubeCaptionLoader(BaseLoader):
     YouTubeCaptionLoader is done via constructor parameters.  After an
     instance of the class has been created, call its `load()` method to begin
     working and return results.
+
+    This differs from langchain_community.document_loaders.YoutubeLoader
+    in that it splits captions into chunks of a specified length and
+    includes the timestamp for the beginning of each chunk in its metadata.
     """
     CHUNK_MINUTES_DEFAULT = 2
     URL_TEMPLATE_DEFAULT = ('https://www.youtube.com/watch?'
