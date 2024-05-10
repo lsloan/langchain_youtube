@@ -1,14 +1,27 @@
+import json
+from typing import List
+
+from langchain_core.documents import Document
+
 from LangChainYouTube import YouTubeCaptionLoader
 
 # U2 - When Love Comes To Town - "en" captions
-mediaUrl = 'https://www.youtube.com/watch?v=7mCE73j59Zs'  # watch-style URL
 # mediaUrl = 'https://www.youtube.com/embed/7mCE73j59Zs'  # embed-style URL
+mediaUrl = 'https://www.youtube.com/watch?v=7mCE73j59Zs'  # watch-style URL
+
 
 # Without CGI Walton Goggins As The Ghoul Is So Weird - "en-US" captions
 # mediaUrl = 'https://www.youtube.com/watch?v=qGulvsKFyvo'
 
-captionLoader = YouTubeCaptionLoader(mediaUrl)
+def main(mediaUrl: str) -> List[Document]:
+    captionLoader = YouTubeCaptionLoader(mediaUrl)
 
-captionDocuments = captionLoader.load()
+    captionDocuments = captionLoader.load()
 
-print(captionDocuments)
+    return captionDocuments
+
+
+if '__main__' == __name__:  # pragma: no cover
+    captionDocuments = main(mediaUrl)
+    print(json.dumps([d.to_json()['kwargs'] for d in captionDocuments],
+                     indent=2, sort_keys=True))
