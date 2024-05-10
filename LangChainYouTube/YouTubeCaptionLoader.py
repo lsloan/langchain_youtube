@@ -117,16 +117,16 @@ class YouTubeCaptionLoader(BaseLoader):
         while (captionsSection := captions.slice(
                 starts_after={'minutes': (start := self.chunkMinutes * index)},
                 ends_before={'minutes': start + self.chunkMinutes})):
+            timestamp = captionsSection[0].start
             captionDocuments.append(Document(
                 page_content=captionsSection.text,
                 metadata={
                     # Start time is rounded to the nearest second
                     'source': self.urlTemplate.format(
                         mediaId=self.mediaId,
-                        startSeconds=captionsSection[0].start.ordinal // 1000
-                    ),
+                        startSeconds=timestamp.ordinal // 1000),  # no ms
                     'media_id': self.mediaId,
-                    'timestamp': str(captionsSection[0].start)[0:-4],  # no ms
+                    'timestamp': str(timestamp)[0:-4],  # no ms
                     'language_code': transcript.language_code,
                     'caption_format': 'SRT',
                     **videoMetadata}))
