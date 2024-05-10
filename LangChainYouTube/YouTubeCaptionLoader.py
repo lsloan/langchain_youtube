@@ -79,12 +79,12 @@ class YouTubeCaptionLoader(BaseLoader):
         self.languages = languages
         self.youtubeMetadataKeys = youtubeMetadataKeys
 
-    def _findTranscript(self, transcriptList):
+    def _findPreferredLanguageTranscript(self, transcriptList):
         """
         Find the first transcript in the list that is not generated and has a
-        language code matching one of the languages in the list.
-        YouTubeTranscriptApi does not provide a CASE-INSENSITIVE method to
-        find a transcript by language code.
+        language code matching one of the languages in `self.languages`.
+        This method resolves the problem that YouTubeTranscriptApi does not
+        have a CASE-INSENSITIVE method to find a transcript by language code.
         :param transcriptList:
         :return:
         """
@@ -103,7 +103,7 @@ class YouTubeCaptionLoader(BaseLoader):
         transcriptList = (
             YouTubeTranscriptApi.list_transcripts(self.mediaId))
 
-        transcript = self._findTranscript(transcriptList)
+        transcript = self._findPreferredLanguageTranscript(transcriptList)
 
         if transcript is None:
             return []
