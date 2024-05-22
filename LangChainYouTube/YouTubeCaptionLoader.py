@@ -1,12 +1,11 @@
 from typing import List, Sequence
 
-import pysrt
 from langchain_community.document_loaders import YoutubeLoader
 from langchain_community.document_loaders.base import BaseLoader
 from langchain_core.documents import Document
 from pytube import YouTube as pytube
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api.formatters import SRTFormatter
+from youtube_transcript_api import YouTubeTranscriptApi, TranscriptList, \
+    Transcript
 
 
 class YouTubeCaptionLoader(BaseLoader):
@@ -22,7 +21,7 @@ class YouTubeCaptionLoader(BaseLoader):
     in that it splits captions into chunks of a specified length and
     includes the timestamp for the beginning of each chunk in its metadata.
     """
-    CHUNK_MINUTES_DEFAULT = 2
+    CHUNK_SECONDS_DEFAULT = 120
     URL_TEMPLATE_DEFAULT = ('https://www.youtube.com/watch?'
                             'v={mediaId}&t={startSeconds}s')
     LANGUAGES_DEFAULT = (
@@ -36,7 +35,7 @@ class YouTubeCaptionLoader(BaseLoader):
     def __init__(self,
                  mediaUrl: str,
                  urlTemplate: str = URL_TEMPLATE_DEFAULT,
-                 chunkMinutes: int = CHUNK_MINUTES_DEFAULT,
+                 chunkSeconds: int = CHUNK_SECONDS_DEFAULT,
                  languages: Sequence[str] = LANGUAGES_DEFAULT,
                  youtubeMetadataKeys: Sequence[str] =
                  YOUTUBE_METADATA_KEYS_DEFAULT):
@@ -47,13 +46,13 @@ class YouTubeCaptionLoader(BaseLoader):
             the `source` metadata property of LangChain `Document` objects.
             It must contain the fields `mediaId` and `startSeconds` ONLY to be
             filled in by `str.format()`.  *Defaults to the value of
-            `YouTubeCaptionLoader.URLTEMPLATEDEFAULT`.*
-        :param chunkMinutes: *Optional* Integer number of minutes of the length
+            `YouTubeCaptionLoader.URL_TEMPLATE_DEFAULT`.*
+        :param chunkSeconds: *Optional* Integer number of seconds of the length
             of each caption chunk loaded from YouTube.  *Defaults to the value
-            of`YouTubeCaptionLoader.CHUNKMINUTESDEFAULT`.*
+            of`YouTubeCaptionLoader.CHUNK_SECONDS_DEFAULT`.*
         :param languages: *Optional* Sequence of strings containing language
             codes for which to load captions.  *Defaults to the value of
-            `YouTubeCaptionLoader.LANGUAGESDEFAULT`, a list of various English
+            `YouTubeCaptionLoader.LANGUAGES_DEFAULT`, a list of various English
             dialects from ISO 639-1, ordered by similarity to `en-us`.  See:
             https://gist.github.com/jrnk/8eb57b065ea0b098d571#file-iso-639-1-language-json*
         :param youtubeMetadataKeys: *Optional* Sequence of strings containing
@@ -69,17 +68,19 @@ class YouTubeCaptionLoader(BaseLoader):
             raise ValueError('urlTemplate must be specified, with fields for'
                              '"{mediaId}" and "{startSeconds}".')
 
+        # LangChain's method for handling YouTube URLs works well
         self.mediaId = YoutubeLoader.extract_video_id(mediaUrl)
         if not self.mediaId:
             raise ValueError('mediaId could not be extracted from mediaUrl')
 
         self.mediaUrl = mediaUrl
         self.urlTemplate = urlTemplate
-        self.chunkMinutes = int(chunkMinutes)
+        self.chunkSeconds = int(chunkSeconds)
         self.languages = languages
         self.youtubeMetadataKeys = youtubeMetadataKeys
 
-    def _findPreferredLanguageTranscript(self, transcriptList):
+    def _findPreferredLanguageTranscript(
+            self, transcriptList: TranscriptList) -> Transcript | None:
         """
         Find the first transcript in the list that is not generated and has a
         language code matching one of the languages in `self.languages`.
@@ -96,9 +97,20 @@ class YouTubeCaptionLoader(BaseLoader):
         return None
 
     def load(self) -> List[Document]:
-        videoDetails = pytube(self.mediaUrl).vid_info.get('videoDetails', {})
-        videoMetadata = {key: value for key in self.youtubeMetadataKeys
-                         if (value := videoDetails.get(key)) is not None}
+        def makeChunkDocument() -> Document:
+            """Create Document from chunk of transcript pieces."""
+            m, s = divmod(chunkStartSeconds, 60)
+            h, m = divmod(m, 60)
+            return Document(
+                page_content=' '.join(
+                    c['text'].strip(' ') for c in chunkPieces),
+                metadata={
+                    'source':  # replace video ID with URL to start time
+                        f'https://www.youtube.com/watch?v={self.mediaId}'
+                        f'&t={chunkStartSeconds}s',
+                    'start_seconds': chunkStartSeconds,
+                    'start_timestamp': f'{h:02d}:{m:02d}:{s:02d}',
+                    **staticMetadata})
 
         transcriptList = (
             YouTubeTranscriptApi.list_transcripts(self.mediaId))
@@ -108,28 +120,30 @@ class YouTubeCaptionLoader(BaseLoader):
         if transcript is None:
             return []
 
-        transcriptSrt = SRTFormatter().format_transcript(transcript.fetch())
+        videoDetails = pytube(self.mediaUrl).vid_info.get('videoDetails', {})
+        staticMetadata = {**{k: v for k in self.youtubeMetadataKeys
+                             if (v := videoDetails.get(k)) is not None},
+                          'caption_language_code': transcript.language_code,
+                          'media_id': self.mediaId}
 
-        captionDocuments: List[Document] = []
-        captions = pysrt.from_string(transcriptSrt)
+        transcriptPieces = transcript.fetch()
 
-        index = 0
-        while (captionsSection := captions.slice(
-                starts_after={'minutes': (start := self.chunkMinutes * index)},
-                ends_before={'minutes': start + self.chunkMinutes})):
-            timestamp = captionsSection[0].start
-            captionDocuments.append(Document(
-                page_content=captionsSection.text,
-                metadata={
-                    # Start time is rounded to the nearest second
-                    'source': self.urlTemplate.format(
-                        mediaId=self.mediaId,
-                        startSeconds=timestamp.ordinal // 1000),  # no ms
-                    'media_id': self.mediaId,
-                    'timestamp': str(timestamp)[0:-4],  # no ms
-                    'language_code': transcript.language_code,
-                    'caption_format': 'SRT',
-                    **videoMetadata}))
-            index += 1
+        documents: List[Document] = []
+        chunkPieces = []
+        chunkStartSeconds = 0
+        chunkTimeLimit = self.chunkSeconds
+        for transcriptPiece in transcriptPieces:
+            if (transcriptPiece['start'] +
+                    transcriptPiece['duration'] > chunkTimeLimit):
+                if chunkPieces:
+                    documents.append(makeChunkDocument())
+                    chunkPieces = []
+                chunkStartSeconds = chunkTimeLimit
+                chunkTimeLimit += self.chunkSeconds
+            chunkPieces.append(transcriptPiece)
 
-        return captionDocuments
+        # handle chunk pieces left over from last iteration
+        if chunkPieces:
+            documents.append(makeChunkDocument())
+
+        return documents
