@@ -1,4 +1,3 @@
-import json
 from typing import List
 
 from langchain_core.documents import Document
@@ -23,5 +22,4 @@ def main(mediaUrl: str) -> List[Document]:
 
 if '__main__' == __name__:  # pragma: no cover
     captionDocuments = main(mediaUrl)
-    print(json.dumps([d.to_json()['kwargs'] for d in captionDocuments],
-                     indent=2, sort_keys=True))
+    print('\n\n'.join(map(repr, captionDocuments)))
