@@ -24,9 +24,9 @@ class YouTubeCaptionLoader(BaseLoader):
     CHUNK_SECONDS_DEFAULT = 120
     URL_TEMPLATE_DEFAULT = ('https://www.youtube.com/watch?'
                             'v={mediaId}&t={startSeconds}s')
-    LANGUAGES_DEFAULT = (
-        'en-us', 'en', 'en-ca', 'en-gb', 'en-ie', 'en-au', 'en-nz', 'en-bz',
-        'en-jm', 'en-ph', 'en-tt', 'en-za', 'en-zw')
+    LANGUAGES_DEFAULT = ('en-us', 'en', 'en-ca', 'en-gb', 'en-ie', 'en-au',
+                         'en-nz', 'en-bz', 'en-jm', 'en-ph', 'en-tt',
+                         'en-za', 'en-zw')
     """Various English dialects from ISO 639-1, ordered by similarity to 
       `en-us`.  For an unofficial listing of languages with dialects, see: 
       https://gist.github.com/jrnk/8eb57b065ea0b098d571#file-iso-639-1-language-json"""
@@ -105,9 +105,8 @@ class YouTubeCaptionLoader(BaseLoader):
                 page_content=' '.join(
                     c['text'].strip(' ') for c in chunkPieces),
                 metadata={
-                    'source':  # replace video ID with URL to start time
-                        f'https://www.youtube.com/watch?v={self.mediaId}'
-                        f'&t={chunkStartSeconds}s',
+                    'source': self.urlTemplate.format(
+                        mediaId=self.mediaId, startSeconds=chunkStartSeconds),
                     'start_seconds': chunkStartSeconds,
                     'start_timestamp': f'{h:02d}:{m:02d}:{s:02d}',
                     **staticMetadata})
