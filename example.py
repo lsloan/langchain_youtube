@@ -6,7 +6,8 @@ from LangChainYouTube import YouTubeCaptionLoader
 
 # U2 - When Love Comes To Town - "en" captions
 # mediaUrl = 'https://www.youtube.com/embed/7mCE73j59Zs'  # embed-style URL
-mediaUrl = 'https://www.youtube.com/watch?v=7mCE73j59Zs'  # watch-style URL
+# mediaUrl = 'https://www.youtube.com/watch?v=7mCE73j59Zs'  # watch-style URL
+mediaUrl = 'https://youtu.be/7mCE73j59Zs'  # youtu.be-style URL
 
 
 # Without CGI Walton Goggins As The Ghoul Is So Weird - "en-US" captions
@@ -20,6 +21,6 @@ def main(mediaUrl: str) -> List[Document]:
     return captionDocuments
 
 
-if '__main__' == __name__:  # pragma: no cover
+if '__main__' == __name__:
     captionDocuments = main(mediaUrl)
     print('\n\n'.join(map(repr, captionDocuments)))
