@@ -79,22 +79,35 @@ class YouTubeCaptionLoader(BaseLoader):
         self.languages = languages
         self.youtubeMetadataKeys = youtubeMetadataKeys
 
+    def _findPreferredLanguageTranscriptIsGenerated(
+            self, transcriptList: TranscriptList,
+            isGenerated: bool) -> Transcript | None:
+        for language in self.languages:
+            for transcript in transcriptList:
+                if (transcript.is_generated == isGenerated and
+                        transcript.language_code.lower() == language.lower()):
+                    return transcript
+        return None
+
     def _findPreferredLanguageTranscript(
             self, transcriptList: TranscriptList) -> Transcript | None:
         """
         Find the first transcript in the list that is not generated and has a
-        language code matching one of the languages in `self.languages`.
+        language code matching one of the languages in `self.languages`.  If
+        a non-generated transcript is not found, find the first generated one.
         This method resolves the problem that YouTubeTranscriptApi does not
         have a CASE-INSENSITIVE method to find a transcript by language code.
         :param transcriptList:
         :return:
         """
-        for language in self.languages:
-            for transcript in transcriptList:
-                if (not transcript.is_generated and
-                        transcript.language_code.lower() == language.lower()):
-                    return transcript
-        return None
+        transcript = self._findPreferredLanguageTranscriptIsGenerated(
+            transcriptList, False)
+        if transcript is not None:
+            return transcript
+
+        # no manually edited transcript found, fall back to auto-generated ones
+        return self._findPreferredLanguageTranscriptIsGenerated(
+            transcriptList, True)
 
     def load(self) -> List[Document]:
         def makeChunkDocument() -> Document:
